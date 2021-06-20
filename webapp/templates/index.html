@@ -1,0 +1,323 @@
+<!doctype html>
+<html class="no-js" lang="">
+
+<head>
+  <meta charset="utf-8">
+  <title></title>
+  <meta name="description" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+  <!-- Place favicon.ico in the root directory -->
+  <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
+
+</head>
+
+<body>
+  <!--[if IE]>
+    <p class="browserupgrade">You are using an <strong>outdated</strong> browser. Please <a href="https://browsehappy.com/">upgrade your browser</a> to improve your experience and security.</p>
+  <![endif]-->
+
+
+  <div class="jumbotron mb-0 pb-1">
+    <div class="container">
+
+      <h1 class="display-3">Lidar-Vent OPAR</h1>
+      <p>Controle de r&eacute;gulation de temp</p>
+      <h1>Temp&eacute;rature :<span class="badge badge-pill badge-info" id=temp_c></span> </h1> 
+      <h2>Etat r&eacute;gulation : <span class="badge badge-secondary" id=etat_regul></span></h2>
+        <p>
+        <button type='button' class='btn btn-primary' id='regul_on'>R&eacute;gul ON</button>
+        <button type='button' class='btn btn-primary' id='regul_off'>R&eacute;gul OFF</button>
+        
+        
+    </div>
+    
+  </div>
+
+
+  <nav class="navbar navbar-expand-md navbar-center navbar-dark  bg-dark">
+        <!-- <a class="navbar-brand" href="#">Navbar</a> -->
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsExampleDefault" aria-controls="navbarsExampleDefault" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarsExampleDefault">
+          <ul class="navbar-nav mr-auto">
+            <li class="nav-item active">
+              <a class="nav-link" href="#">Temperature <span class="sr-only">(current)</span></a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('page_pompe')}}">Pression</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link disabled" href="#">Autre</a>
+            </li>
+          </ul>
+        </div>
+      </nav>
+
+
+    <div class="container mt-4">
+
+    
+    <!-- Example row of columns -->
+    <div class="row">
+    
+      <div class="col-md-9">
+        
+        <canvas id="tempChart" width="400" height="250"></canvas>
+
+      </div>
+      
+      
+      <div class="col-md-3">
+        <h2>Temp&eacute;rature de consigne</h2>
+        <div class="input-group mb-3">
+        <div class="input-group-prepend">
+          <span class="input-group-text" id="basic-addon0">T_consigne</span>
+        </div>
+        <input type="text" class="form-control" placeholder="00" aria-label="Tconsigne" aria-describedby="pidP" id="Tconsigne_id">
+        </div>
+        <p><a class="btn btn-secondary" href="#" role="button" id='send_Tconsigne'>Envoi &raquo;</a></p>
+        <h2>Valeurs PID</h2>
+        <!-- Champ PID P -->
+        <div class="input-group mb-3">
+        <div class="input-group-prepend">
+          <span class="input-group-text" id="basic-addon1">P</span>
+        </div>
+        <input type="text" class="form-control" placeholder="00" aria-label="pidP" aria-describedby="pidP" id="pidP_id">
+        </div>
+        <!-- Champ PID I -->
+        <div class="input-group mb-3">
+        <div class="input-group-prepend">
+          <span class="input-group-text" id="basic-addon2">I</span>
+        </div>
+        <input type="text" class="form-control"  aria-label="pidI" aria-describedby="pidI" id = "pidI_id">
+        </div>
+        <!-- Champ PID D -->
+        <div class="input-group mb-3">
+        <div class="input-group-prepend">
+          <span class="input-group-text" id="basic-addon3">D</span>
+        </div>
+        <input type="text" class="form-control" placeholder="000" aria-label="pidD" aria-describedby="pidD" id = "pidD_id"> 
+        </div>
+        <p><a class="btn btn-secondary" href="#" role="button" id='send_PID'>Envoi &raquo;</a></p>
+      </div>
+    </div>
+
+
+<!--   <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+
+  <script>window.jQuery || document.write('<script src="js/vendor/jquery-3.3.1.min.js"><\/script>')</script> -->
+  <script>window.jQuery || document.write('<script src="{{ url_for("static", filename="js/jquery-3.3.1.min.js") }}"><\/script>')</script>
+  <script src="{{ url_for('static', filename='js/socket.io.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/Chart.min.js') }}"></script>
+  <!-- <script src="{{ url_for('static', filename='js/moment.min.js') }}"></script> -->
+
+  <script>
+    $(document).ready(function() {
+
+      // Any of the following formats may be used
+      var ctx = $('#tempChart');
+      var temp_Chart = new Chart(ctx, {
+            type: 'line',
+            options: {
+                scales: {
+                    yAxes: [{
+                        ticks: {
+                            suggestedMin: 20,
+                            suggestedMax: 30,
+                            callback: function(value, index, values) {
+                              return value + '°C';
+                            }
+                        }
+                    }]
+                }
+            },
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Sonde',
+                    strokeColor: ['rgba(255, 99, 132, 0.2)'],
+                    pointBorderColor: "#fff",
+                    pointRadius: 5,
+                    data: [],
+                    
+                    },
+                    {
+                    label: 'Consigne',
+                    fill: false,
+                    borderColor: "#3cba9f",
+                    lineTension : 0,
+                    pointRadius: 0,
+                    data: [],
+                }]
+            },
+        });
+
+        function addData(chart, label, data_temp, data_consigne) {
+            chart.data.labels.push(label);
+            chart.data.datasets[0].data.push(data_temp);
+            chart.data.datasets[1].data.push(data_consigne);
+            // chart.data.datasets.forEach((dataset) => {
+            //     dataset.data.push(data);
+            //     // dataset.backgroundColor = "#"+((1<<24)*Math.random()|0).toString(16);
+            // });
+            chart.update();
+        }
+
+        function removeData(chart) {
+            chart.data.labels.splice(0, 1);
+            chart.data.datasets.forEach((dataset) => {
+                dataset.data.splice(0, 1);
+            });
+            chart.update();
+        }
+
+        //Mise en forme de la valeur de l'etat de la regulation :
+        function updateEtatRegul(val_etatRegul) {
+          console.log('updateEtatregul', val_etatRegul)
+          if ((val_etatRegul == 1) || (val_etatRegul === 'on')) {
+            console.log('on')
+            $('#etat_regul').text('On');
+            $('#etat_regul').toggleClass('badge-secondary', false)
+            $('#etat_regul').toggleClass('badge-danger', true)
+            $('#regul_on').prop('disabled', true)
+            $('#regul_off').prop('disabled', false)
+          }
+          else if ((val_etatRegul == 0) || (val_etatRegul === 'off')){
+            console.log('off')
+            $('#etat_regul').text('Off');
+            $('#etat_regul').toggleClass('badge-secondary', true)
+            $('#etat_regul').toggleClass('badge-danger', false)
+            $('#regul_on').prop('disabled', false)
+            $('#regul_off').prop('disabled', true)
+
+          }
+        }
+        
+
+        
+        // updateEtatRegul('{{ etat_regul }}');
+
+
+        function update_variables(etat_variables) {
+          //Mise a jour du rond affichant la temperature temps reel
+          // console.log('update variables')
+          $('#temp_c').text(Number(etat_variables.temp).toFixed(2)+'°C')
+          // ajout des points au graph
+          addData(temp_Chart,
+            new Date().toLocaleTimeString(),
+            etat_variables.temp,
+            $('#Tconsigne_id').attr('placeholder')
+            );
+          if(temp_Chart.data.datasets[0].data.length > 120){
+            removeData(temp_Chart);
+          }
+
+        }
+
+
+        //Socket appelant les variables au DEMARRAGE :
+        var socket = io.connect();
+        // var socket = io.connect();
+        socket.on('connect', function() {
+          console.log('je suis connecte!');
+          socket.emit('get_variables','a');
+
+        });
+
+        //-------------------------------
+        // Changement etat regulation :
+        //-------------------------------
+        socket.on('regul_changed',function(e) {
+          console.log('socket regul_changed ', e.regul_state);
+          updateEtatRegul(e.regul_state);
+        })
+
+        $('#regul_on').click(function(){
+          console.log('Regul On!');
+          socket.emit('regul','on');
+        });
+        
+        $('#regul_off').click(function(){
+          console.log('Regul Off!');
+          socket.emit('regul','off');
+        });
+
+
+        socket.on('temp_changed', function(e){
+          console.log('temp_changed',e)
+          update_variables(e);
+        })
+
+
+        socket.on('regul_update',function(e) {
+          console.log('socket regul_update ', e);
+        });
+
+        //----------------------
+        //Changements des PID
+        //----------------------
+        socket.on('pid_changed',function(e){
+          console.log("nouveaux pid",e);
+          $('#pidP_id').attr('placeholder',e.pid['p']);
+          $('#pidI_id').attr('placeholder',e.pid['i']);
+          $('#pidD_id').attr('placeholder',e.pid['d']);
+        })
+
+        $('#send_PID').click(function(){
+          console.log('Envoi PID');
+          socket.emit('pid_new', 
+          {
+            'p' : send_valeur_form('#pidP_id'),
+            'i': send_valeur_form('#pidI_id'),
+            'd' : send_valeur_form('#pidD_id')
+          });
+          //clear form :
+          $('#pidP_id').val('');
+          $('#pidI_id').val('');
+          $('#pidD_id').val('');
+        });
+
+        function send_valeur_form(form_id){
+          if ($(form_id).val() != '') {
+            return $(form_id).val();
+          }
+          else {
+            return $(form_id).attr('placeholder');
+          }
+        }
+
+        //------------------
+        //Changemenet Tconsigne
+        //----------------------
+        socket.on('Tconsigne_changed',function(e){
+          console.log("nouvelle Tconsigne",e);
+          $('#Tconsigne_id').attr('placeholder',e.Tconsigne);
+        })
+
+
+        $('#send_Tconsigne').click(function(){
+          console.log('Envoi Tconsigne');
+
+          socket.emit('Tconsigne_new',send_valeur_form('#Tconsigne_id'));
+          //clear form :
+          $('#Tconsigne_id').val('');
+        });
+
+
+        socket.on('vanne_switch_changed',function(e) {
+          console.log('socket vanne_switch_changed ', e.pos);
+        });
+
+
+
+      });
+
+
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,346 @@
+<!doctype html>
+<html class="no-js" lang="">
+
+<head>
+  <meta charset="utf-8">
+  <title></title>
+  <meta name="description" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+  <!-- Place favicon.ico in the root directory -->
+
+
+</head>
+
+<body>
+  <!--[if IE]>
+    <p class="browserupgrade">You are using an <strong>outdated</strong> browser. Please <a href="https://browsehappy.com/">upgrade your browser</a> to improve your experience and security.</p>
+  <![endif]-->
+
+
+
+  <div class="jumbotron mb-0 pb-1">
+    <div class="container">
+
+      <h1 class="display-3">Lidar-Vent OPAR</h1>
+      <p>Controle de la pompe</p>
+      <h1>Temp&eacute;rature :<span class="badge badge-pill badge-info" id=temp_c></span> </h1> 
+      <h2>Etat r&eacute;gulation : <span class="badge badge-secondary" id=etat_regul></span></h2>
+        <p>
+        <button type='button' class='btn btn-primary' id='regul_on'>R&eacute;gul ON</button>
+        <button type='button' class='btn btn-primary' id='regul_off'>R&eacute;gul OFF</button>
+        
+        
+    </div>
+  
+  </div>
+
+    <nav class="navbar navbar-expand-md navbar-center navbar-dark  bg-dark">
+      <!-- <a class="navbar-brand" href="#">Navbar</a> -->
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsExampleDefault" aria-controls="navbarsExampleDefault" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navbarsExampleDefault">
+        <ul class="navbar-nav mr-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('index')}}">Temperature </a>
+          </li>
+          <li class="nav-item active">
+            <a class="nav-link" href="#">Pression</a><span class="sr-only">(current)</span>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link disabled" href="#">Autre</a>
+          </li>
+        </ul>
+      </div>
+    </nav> 
+
+    <div class="container mt-4">
+
+    
+    <!-- Example row of columns -->
+    <div class="row">
+    
+      <div class="col-md-7">
+        <h1 class="display-4">Controle Piston</h1>
+        <p><h1>Ordres</h1></p>
+        <p><button class="btn btn-primary" type="button" id='btn_connect'>Connect &raquo;</button></p>
+        <p><button class="btn btn-secondary" type="button" id='btn_go_home'>Find Home (0) &raquo;</button></p>
+        <p><button class="btn btn-secondary" type="button" id='btn_stop'>Stop move!</button></p>
+
+        <h1>Déplacement piston [0,25]</h1>
+        <p>
+        <button class="btn btn-secondary" type="button" id='btn_jog_0'> &laquo; -1.0 </button>
+        <button class="btn btn-secondary" type="button" id='btn_jog_1'> &lsaquo; -0.1 </button>
+        <button class="btn btn-secondary" type="button" id='btn_jog_2'> +0.1 &rsaquo;</button>
+        <button class="btn btn-secondary" type="button" id='btn_jog_3'> +1.0 &raquo;</button>
+    	</p>
+
+
+        <div class="input-group">
+          <input type="text" class="form-control-lg" id = "position_moteur_id"  onkeyup="success()">
+           <div class="input-group-append">
+          <button class="btn btn-primary btn-lg" type="button" id='btn_position_go'>go &raquo;</button>
+          </div>           
+        </div>
+
+     
+
+      </div>
+      
+      
+      <div class="col-md-5">
+        <h1 class="display-4">Controle Vanne</h1>
+        <p><h1>Go to</h1></p>
+        <p><button class="btn btn-secondary" type="button" id='btn_vanne_pos1'>Piston &harr; Air &raquo;</button></p>
+        <p><button class="btn btn-secondary" type="button" id='btn_vanne_pos2'>Piston &harr; FP  &raquo;</button></p>
+        <p><h2>Position : <span class="badge-pill badge-secondary" id=badge_vanne_pos></span></h1></p>
+      </div>
+    </div>
+
+
+  <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+  <script>window.jQuery || document.write('<script src="js/vendor/jquery-3.3.1.min.js"><\/script>')</script>
+  <script src="{{ url_for('static', filename='js/socket.io.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
+  
+
+
+
+  <script>
+        var connected = false;
+        $(document).ready(function() {
+          // On load :
+            $('#position_moteur_id').attr('placeholder','...');
+            updateButtonsState();
+            $('#btn_position_go').prop('disabled', true);
+            // $('#example').tooltip(options);
+         });
+
+
+
+
+        function updateButtonsState() {
+          console.log('updateButtonsState : ', connected)
+          console.log(connected)
+          
+          $('#btn_connect').prop('disabled', connected); 
+          $('#btn_go_home').prop('disabled', !connected);
+          $('#btn_jog_0').prop('disabled', !connected);
+          $('#btn_jog_1').prop('disabled', !connected);
+          $('#btn_jog_2').prop('disabled', !connected);
+          $('#btn_jog_3').prop('disabled', !connected);
+          $('#btn_stop').prop('disabled', !connected);
+          $('#position_moteur_id').prop('disabled', !connected);
+
+          if(connected){
+            $('#btn_connect').text('connecté');
+          }
+          else{
+            $('#btn_connect').text('Connection');
+          }
+          
+        }
+ 
+        //Socket appelant les variables au DEMARRAGE :
+        var socket = io.connect();
+        socket.on('connect', function() {
+          console.log('je suis connecte!');
+          socket.emit('get_variables','a');
+
+        });
+
+        //-------------------------------
+        // Changement etat regulation :
+        //-------------------------------
+                 //Mise en forme de la valeur de l'etat de la regulation :
+        function updateEtatRegul(val_etatRegul) {
+          console.log('updateEtatregul', val_etatRegul)
+          if ((val_etatRegul == 1) || (val_etatRegul === 'on')) {
+            console.log('on')
+            $('#etat_regul').text('On');
+            $('#etat_regul').toggleClass('badge-secondary', false);
+            $('#etat_regul').toggleClass('badge-danger', true);
+            $('#regul_on').prop('disabled', true);
+            $('#regul_off').prop('disabled', false);
+          }
+          else if ((val_etatRegul == 0) || (val_etatRegul === 'off')){
+            console.log('off')
+            $('#etat_regul').text('Off');
+            $('#etat_regul').toggleClass('badge-secondary', true);
+            $('#etat_regul').toggleClass('badge-danger', false);
+            $('#regul_on').prop('disabled', false);
+            $('#regul_off').prop('disabled', true);
+
+          }
+        }
+
+        function update_variables(etat_variables) {
+          //Mise a jour du rond affichant la temperature temps reel
+          // console.log('update variables')
+          $('#temp_c').text(Number(etat_variables.temp).toFixed(2)+'°C');
+
+        }
+
+        socket.on('regul_changed',function(e) {
+          console.log('socket regul_changed ', e.regul_state);
+          updateEtatRegul(e.regul_state);
+        })
+
+        $('#regul_on').click(function(){
+          console.log('Regul On!');
+          socket.emit('regul','on');
+        });
+        
+        $('#regul_off').click(function(){
+          console.log('Regul Off!');
+          socket.emit('regul','off');
+        });
+
+
+        socket.on('temp_changed', function(e){
+          // console.log('temp_changed',e)
+          update_variables(e);
+        })
+
+
+        socket.on('regul_update',function(e) {
+          console.log('socket regul_update ', e);
+        });
+         
+         
+          
+        //-------------------------------
+        // Changement POMPE: - pour l'instant brouillon
+        //-------------------------------
+//        socket.on('position_changed',function(e) {
+//          console.log('socket position_changed ', e.position_state);
+//          updateEtatRegul(e.regul_state);
+//        })
+        
+        $('#btn_connect').click(function(){
+          console.log('CONNECT !!');
+          // Icone de chargement qui tourne
+          $(this).html(
+            `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Connection...`
+          );
+          socket.emit('drv_connect','go');
+        }); 
+
+
+        $('#btn_go_home').click(function(){
+          console.log('Go HOME !!');
+          socket.emit('go_home','go');
+        }); 
+
+        $('#btn_stop').click(function(){
+          console.log('STOP!!');
+          socket.emit('stop','go');
+        }); 
+        
+        $('#btn_jog_0').click(function(){
+          console.log('JOG 0 !!');
+          position_go = Number($('#position_moteur_id').attr('placeholder'))-1
+          console.log('Go position !!',position_go)
+          socket.emit('position_go',position_go);
+        }); 
+
+
+        $('#btn_jog_1').click(function(){
+          console.log('JOG 1 !!');
+          socket.emit('jog',1);
+        }); 
+
+        $('#btn_jog_2').click(function(){
+          console.log('JOG 2 !!');
+          socket.emit('jog',2);
+        }); 
+
+
+        $('#btn_jog_3').click(function(){
+          console.log('JOG 3 !!');
+          position_go = Number($('#position_moteur_id').attr('placeholder'))+1
+          console.log('Go position !!',position_go)
+          socket.emit('position_go',position_go);
+        });
+          
+        $('#btn_position_go').click(function(){
+          var position = $('#position_moteur_id').val()
+          console.log('Go position !!',position);
+          socket.emit('position_go',position);
+          // clear form :
+          $('#position_moteur_id').val('')
+          $('#btn_position_go').prop('disabled', true);
+        }); 
+
+        socket.on('position_changed',function(e) {
+          //Le socket recoit des positions des que liaison série active
+           if(!connected){
+            connected = true;
+            updateButtonsState();
+          }
+           $('#position_moteur_id').attr('placeholder',Number(e.position).toFixed(3));
+        })
+
+
+        function success() {
+         if(document.getElementById("position_moteur_id").value==="") { 
+                  $('#btn_position_go').prop('disabled', true); 
+              } else { 
+                 $('#btn_position_go').prop('disabled', false);
+              }
+          }
+
+        //-------------------------------
+        // Changement Vanne :
+        //-------------------------------
+        $('#btn_vanne_pos1').click(function(){
+          console.log('Vanne pos1 !!');
+          socket.emit('vanne_position_go','pos1');
+        }); 
+
+        $('#btn_vanne_pos2').click(function(){
+          console.log('Vanne pos2 !!');
+          socket.emit('vanne_position_go','pos2');
+        }); 
+
+
+        socket.on('vanne_switch_changed',function(e) {
+          if (e.pos== 'pos1') {
+            console.log('switch : pos1')
+            $('#badge_vanne_pos').text('Piston \u2194 Air');
+            $('#badge_vanne_pos').toggleClass('badge-warning', true)
+            $('#btn_vanne_pos1').prop('disabled', true);
+            $('#btn_vanne_pos2').prop('disabled', false);
+          }
+          else if (e.pos== 'pos2') {
+            console.log('switch : pos2')
+            $('#badge_vanne_pos').text('Piston \u2194 FP');
+            $('#badge_vanne_pos').toggleClass('badge-success', true)
+            $('#btn_vanne_pos1').prop('disabled', false);
+            $('#btn_vanne_pos2').prop('disabled', true);
+          }
+          else if (e.pos== 'moving') {
+            console.log('switch : pos2')
+            $('#badge_vanne_pos').text('moving');
+            $('#badge_vanne_pos').toggleClass('badge-dark', true)
+            $('#btn_vanne_pos1').prop('disabled', true);
+            $('#btn_vanne_pos2').prop('disabled', true);
+          }
+          else if (e.pos== 'None') {
+            console.log('switch : None')
+            $('#badge_vanne_pos').text('None');
+            $('#badge_vanne_pos').toggleClass('badge-secondary', true)
+            $('#btn_vanne_pos1').prop('disabled', false);
+            $('#btn_vanne_pos2').prop('disabled', false);
+          }
+
+        })
+
+  </script>
+
+  </script>
+</body>
+
+</html>
